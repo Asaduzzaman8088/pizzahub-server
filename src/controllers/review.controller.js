@@ -2,6 +2,7 @@ import { Review } from "../models/Review.js"
 import { MenuItem } from "../models/MenuItem.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
+import { recalculateItemRating } from "../utils/ratings.js"
 
 export function serializeReview(review) {
   const customer = review.customerId && review.customerId._id ? review.customerId : null
@@ -15,17 +16,6 @@ export function serializeReview(review) {
       ? { id: customer._id.toString(), name: customer.name, image: customer.image }
       : null,
   }
-}
-
-async function recalculateItemRating(itemId) {
-  const [agg] = await Review.aggregate([
-    { $match: { itemId } },
-    { $group: { _id: null, average: { $avg: "$rating" }, count: { $sum: 1 } } },
-  ])
-  await MenuItem.findByIdAndUpdate(itemId, {
-    rating: agg ? Number(agg.average.toFixed(1)) : 0,
-    reviewCount: agg ? agg.count : 0,
-  })
 }
 
 export const listReviews = asyncHandler(async (req, res) => {
