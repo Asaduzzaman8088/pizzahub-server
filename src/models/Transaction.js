@@ -40,4 +40,7 @@ const transactionSchema = new mongoose.Schema(
   }
 )
 
+transactionSchema.index({ stripeSessionId: 1 }, { unique: true })
+transactionSchema.index({ vendorId: 1, createdAt: -1 })
+
 export const Transaction = mongoose.models.Transaction || mongoose.model("Transaction", transactionSchema)

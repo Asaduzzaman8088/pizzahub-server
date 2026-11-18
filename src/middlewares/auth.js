@@ -1,86 +1,98 @@
-import * as jose from "jose"
+import jwt from "jsonwebtoken"
 import { env } from "../config/env.js"
 import { User } from "../models/User.js"
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+
+function cookieOptions() {
+  return {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
+    maxAge: SEVEN_DAYS_MS,
+  }
+}
+
+export function generateToken(payload) {
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN })
+}
+
+export function signToken(user) {
+  return generateToken({ id: user._id.toString(), role: user.role })
+}
+
+export function setAuthCookie(res, token) {
+  res.cookie(env.COOKIE_NAME, token, cookieOptions())
+}
+
+export function clearAuthCookie(res) {
+  res.clearCookie(env.COOKIE_NAME, { path: "/" })
+}
+
+function extractToken(req) {
+  const header = req.headers.authorization
+  if (header && header.startsWith("Bearer ")) {
+    return header.slice(7).trim()
+  }
+  return req.cookies?.[env.COOKIE_NAME] || null
+}
+
+async function resolveUser(req, token) {
+  const decoded = jwt.verify(token, env.JWT_SECRET)
+  const user = await User.findById(decoded.id)
+  if (!user) {
+    const error = new Error("The account linked to this token no longer exists.")
+    error.statusCode = 401
+    throw error
+  }
+  if (user.isBlocked) {
+    const error = new Error("Your account has been blocked. Contact support.")
+    error.statusCode = 403
+    throw error
+  }
+  return user
+}
+
 export async function verifyToken(req, res, next) {
   try {
-    let token = null
-
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer ")
-    ) {
-      token = req.headers.authorization.split(" ")[1]
-    } else if (req.cookies && req.cookies.token) {
-      token = req.cookies.token
-    }
-
+    const token = extractToken(req)
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required. No token provided.",
-      })
+      return res.status(401).json({ success: false, message: "Authentication required." })
     }
-
-    const secret = new TextEncoder().encode(env.JWT_SECRET)
-    const { payload } = await jose.jwtVerify(token, secret)
-
-    const user = await User.findById(payload.id || payload._id || payload.sub).select("-password")
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User account no longer exists.",
-      })
-    }
-
-    if (user.isBlocked) {
-      return res.status(403).json({
-        success: false,
-        message: "Your account has been suspended by an administrator.",
-      })
-    }
-
-    req.user = user
+    req.user = await resolveUser(req, token)
+    req.userId = req.user._id.toString()
     next()
   } catch (error) {
-    if (error.code === "ERR_JWT_EXPIRED" || error.name === "TokenExpiredError") {
-      return res.status(401).json({
-        success: false,
-        message: "Session expired. Please log in again.",
-      })
-    }
-    return res.status(401).json({
-      success: false,
-      message: "Invalid or malformed authentication token.",
-    })
+    next(error)
   }
 }
 
-export function requireRole(...allowedRoles) {
+export async function optionalAuth(req, res, next) {
+  try {
+    const token = extractToken(req)
+    if (token) {
+      req.user = await resolveUser(req, token)
+      req.userId = req.user._id.toString()
+    }
+  } catch {
+    req.user = undefined
+    req.userId = undefined
+  }
+  next()
+}
+
+export function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required.",
-      })
+      return res.status(401).json({ success: false, message: "Authentication required." })
     }
-
-    if (!allowedRoles.includes(req.user.role)) {
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: `Forbidden. Access restricted to role(s): ${allowedRoles.join(", ")}.`,
+        message: `Access denied. Requires one of: ${roles.join(", ")}.`,
       })
     }
-
     next()
   }
-}
-
-export async function generateToken(payload) {
-  const secret = new TextEncoder().encode(env.JWT_SECRET)
-  return await new jose.SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(env.JWT_EXPIRES_IN || "7d")
-    .sign(secret)
 }

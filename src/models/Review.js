@@ -29,4 +29,7 @@ const reviewSchema = new mongoose.Schema(
   }
 )
 
+reviewSchema.index({ itemId: 1, customerId: 1 }, { unique: true })
+reviewSchema.index({ itemId: 1, createdAt: -1 })
+
 export const Review = mongoose.models.Review || mongoose.model("Review", reviewSchema)

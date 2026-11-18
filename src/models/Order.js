@@ -26,6 +26,21 @@ const orderSchema = new mongoose.Schema(
       required: [true, "Delivery address is required"],
       trim: true,
     },
+    quantity: {
+      type: Number,
+      default: 1,
+      min: [1, "Quantity must be at least 1"],
+    },
+    unitPrice: {
+      type: Number,
+      default: 0,
+      min: [0, "Unit price must be non-negative"],
+    },
+    totalPrice: {
+      type: Number,
+      default: 0,
+      min: [0, "Total price must be non-negative"],
+    },
     message: {
       type: String,
       trim: true,
@@ -41,5 +56,9 @@ const orderSchema = new mongoose.Schema(
     timestamps: true,
   }
 )
+
+orderSchema.index({ customerId: 1, createdAt: -1 })
+orderSchema.index({ vendorId: 1, status: 1, createdAt: -1 })
+orderSchema.index({ status: 1, createdAt: -1 })
 
 export const Order = mongoose.models.Order || mongoose.model("Order", orderSchema)
