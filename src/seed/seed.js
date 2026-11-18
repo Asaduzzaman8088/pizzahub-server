@@ -424,19 +424,24 @@ const items = [
 ]
 
 async function upsertUser({ name, email, password, role, businessName }) {
-  const hashed = await hashPassword(password)
+  const existing = await User.findOne({ email })
+  const updates = {
+    name,
+    email,
+    role,
+    businessName: businessName || undefined,
+    isBlocked: false,
+  }
+
+  // Once an account has migrated to Better Auth, do not recreate a legacy
+  // bcrypt password that could resurrect an old credential.
+  if (!existing?.authUserId) {
+    updates.password = await hashPassword(password)
+  }
+
   return User.findOneAndUpdate(
     { email },
-    {
-      $set: {
-        name,
-        email,
-        password: hashed,
-        role,
-        businessName: businessName || undefined,
-        isBlocked: false,
-      },
-    },
+    { $set: updates },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   )
 }

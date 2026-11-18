@@ -7,7 +7,7 @@ import rateLimit from "express-rate-limit"
 import { toNodeHandler } from "better-auth/node"
 import { env, getAllowedOrigins } from "./config/env.js"
 import { connectDB } from "./config/db.js"
-import { auth } from "./config/auth.js"
+import { getAuth } from "./config/auth.js"
 import apiRoutes from "./routes/index.js"
 import { errorHandler, notFoundHandler } from "./middlewares/error.js"
 
@@ -74,7 +74,13 @@ app.use(async (req, res, next) => {
 })
 
 // Better Auth handles its own authentication endpoints (sign-up, sign-in, sessions, OAuth).
-app.all("/api/better-auth/*", toNodeHandler(auth))
+app.all("/api/better-auth/*", async (req, res, next) => {
+  try {
+    return toNodeHandler(await getAuth())(req, res, next)
+  } catch (error) {
+    next(error)
+  }
+})
 
 app.use("/api", apiRoutes)
 

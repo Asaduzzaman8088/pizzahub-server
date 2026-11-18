@@ -5,7 +5,7 @@ import { ApiError } from "../utils/ApiError.js"
 import { hashPassword, comparePassword } from "../utils/password.js"
 import { signToken, setAuthCookie, clearAuthCookie } from "../middlewares/auth.js"
 import { isPremiumActive } from "../utils/subscription.js"
-import { auth } from "../config/auth.js"
+import { getAuth } from "../config/auth.js"
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z]).{6,}$/
@@ -58,8 +58,10 @@ export const register = asyncHandler(async (req, res) => {
     throw ApiError.conflict("An account with this email already exists.")
   }
 
+  let auth
   let authUserId
   try {
+    auth = await getAuth()
     const result = await auth.api.signUpEmail({
       body: {
         name: name.trim(),
@@ -119,13 +121,25 @@ export const login = asyncHandler(async (req, res) => {
   const providedPassword = String(password)
 
   let authUser = null
+  let authUnavailable = false
   try {
+    const auth = await getAuth()
     const result = await auth.api.signInEmail({
       body: { email: normalizedEmail, password: providedPassword },
     })
     authUser = result?.user || null
-  } catch {
-    // Fall back to legacy bcrypt accounts created before Better Auth was wired in.
+  } catch (error) {
+    const status = error?.statusCode || error?.status
+    const message = error?.body?.message || error?.message || ""
+    if (status === 429) {
+      throw new ApiError(429, "Too many sign-in attempts. Please try again in a minute.")
+    }
+    const isCredentialError =
+      status === 400 || status === 401 || /invalid|credential|password/i.test(message)
+    if (!isCredentialError) {
+      console.error("[auth] Better Auth sign-in failed:", message)
+      authUnavailable = true
+    }
   }
 
   let user = await User.findOne({ email: normalizedEmail }).select("+password")
@@ -146,6 +160,12 @@ export const login = asyncHandler(async (req, res) => {
 
   if (!authUser) {
     if (!user.password) {
+      if (authUnavailable) {
+        throw new ApiError(
+          503,
+          "Authentication service is temporarily unavailable. Please try again."
+        )
+      }
       if (user.authProvider === "google") {
         throw ApiError.badRequest(
           "This account was registered using Google. Please sign in with Google."
@@ -156,11 +176,18 @@ export const login = asyncHandler(async (req, res) => {
 
     const matches = await comparePassword(providedPassword, user.password)
     if (!matches) {
+      if (authUnavailable) {
+        throw new ApiError(
+          503,
+          "Authentication service is temporarily unavailable. Please try again."
+        )
+      }
       throw ApiError.unauthorized("Invalid email or password.")
     }
 
     // Transparently migrate legacy accounts into Better Auth on first login.
     try {
+      const auth = await getAuth()
       const result = await auth.api.signUpEmail({
         body: {
           name: user.name,
@@ -171,6 +198,9 @@ export const login = asyncHandler(async (req, res) => {
       })
       if (result?.user?.id) {
         user.authUserId = result.user.id
+        // Better Auth is now the source of truth; drop the legacy bcrypt hash
+        // so a previously changed password cannot still be used to sign in.
+        user.password = undefined
         await user.save()
       }
     } catch {
@@ -379,14 +409,32 @@ export const updateProfile = asyncHandler(async (req, res) => {
     const providedCurrent = String(currentPassword || "")
 
     if (user.authUserId) {
+      let auth
       try {
+        auth = await getAuth()
         await auth.api.signInEmail({ body: { email: user.email, password: providedCurrent } })
-      } catch {
+      } catch (error) {
+        const status = error?.statusCode || error?.status
+        const message = error?.body?.message || error?.message || ""
+        if (status === 429) {
+          throw new ApiError(429, "Too many attempts. Please try again in a minute.")
+        }
+        const isCredentialError =
+          status === 400 || status === 401 || /invalid|credential|password/i.test(message)
+        if (!isCredentialError) {
+          console.error("[auth] Better Auth password verification failed:", message)
+          throw new ApiError(
+            503,
+            "Authentication service is temporarily unavailable. Please try again."
+          )
+        }
         throw ApiError.badRequest("Current password is incorrect.")
       }
       const ctx = await auth.$context
       const hashed = await ctx.password.hash(String(newPassword))
       await ctx.internalAdapter.updatePassword(user.authUserId, hashed)
+      // Remove any stale legacy hash so the old password stops working.
+      user.password = undefined
     } else {
       const matches = user.password
         ? await comparePassword(providedCurrent, user.password)
