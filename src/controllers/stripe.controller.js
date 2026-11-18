@@ -31,7 +31,7 @@ async function activatePremium({ vendorId, sessionId, subscriptionId, amount }) 
     {
       vendorId,
       plan: "premium",
-      amount: amount || 19.99,
+      amount: amount || 5,
       currency: "usd",
       stripeSessionId: sessionId,
       stripeSubscriptionId: subscriptionId || "",
@@ -124,7 +124,7 @@ export const handleWebhook = async (req, res) => {
           vendorId,
           sessionId: session.id,
           subscriptionId: session.subscription,
-          amount: session.amount_total ? session.amount_total / 100 : 19.99,
+          amount: session.amount_total ? session.amount_total / 100 : 5,
         })
       }
     } else if (event.type === "customer.subscription.deleted") {
@@ -175,7 +175,7 @@ export const simulatePremiumUpgrade = asyncHandler(async (req, res) => {
     vendorId: req.user._id,
     sessionId,
     subscriptionId: `demo_sub_${Date.now()}`,
-    amount: 19.99,
+    amount: 5,
   })
 
   res.status(200).json({
