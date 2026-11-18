@@ -62,11 +62,28 @@ export const createOrder = asyncHandler(async (req, res) => {
   }
 
   const item = await MenuItem.findById(itemId)
-  if (!item || item.status !== "approved") {
+  if (!item || item.status !== "approved" || item.isAvailable === false) {
     throw ApiError.notFound("This pizza is not available for ordering.")
   }
 
   const qty = Math.min(20, Math.max(1, Number(quantity) || 1))
+
+  const dayStart = new Date(parsedDate)
+  dayStart.setUTCHours(0, 0, 0, 0)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
+
+  const duplicate = await Order.findOne({
+    customerId: req.user._id,
+    itemId: item._id,
+    status: { $in: ["pending", "accepted"] },
+    deliveryDate: { $gte: dayStart, $lt: dayEnd },
+  })
+  if (duplicate) {
+    throw ApiError.conflict(
+      "You already have an active order for this pizza on the selected delivery date."
+    )
+  }
 
   const order = await Order.create({
     itemId: item._id,
