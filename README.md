@@ -2,9 +2,9 @@
 
 The Express + MongoDB REST API for **PizzaHub**, a multi-vendor pizza ordering platform. It provides authentication, role-based authorization, menu and order management, reviews, wishlist, admin moderation, and Stripe subscription payments.
 
-- **Live API:** `<LIVE_API_URL>`
-- **Server repository:** `<SERVER_GITHUB_URL>`
-- **Client repository:** `<CLIENT_GITHUB_URL>`
+- **Live API:** https://pizzahub-server-eight.vercel.app
+- **Server repository:** https://github.com/Asaduzzaman8088/pizzahub-server
+- **Client repository:** https://github.com/Asaduzzaman8088/pizzahub-client
 
 ## Features
 
@@ -141,8 +141,8 @@ The server ships with a serverless entry point at `api/index.js` and a `vercel.j
    - `NODE_ENV=production`
    - `MONGO_URI` — a **cloud** MongoDB URI (Atlas). `127.0.0.1` is not reachable from Vercel.
    - `JWT_SECRET`, `BETTER_AUTH_SECRET` — different, strong random values.
-   - `BETTER_AUTH_URL=https://<server-project>.vercel.app`
-   - `CLIENT_URL=https://<client-project>.vercel.app`
+   - `BETTER_AUTH_URL=https://pizzahub-server-eight.vercel.app`
+   - `CLIENT_URL=https://pizzahub-client-two.vercel.app`
    - `ALLOWED_ORIGINS` — any extra client origins (optional)
    - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PREMIUM_PRICE_ID`
    - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (optional)
