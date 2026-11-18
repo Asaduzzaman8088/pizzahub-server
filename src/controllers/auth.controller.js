@@ -226,31 +226,54 @@ export const googleAuth = asyncHandler(async (req, res) => {
     }
   } else if (accessToken) {
     // 2. Google OAuth2 Access Token
-    const response = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
-    )
-    if (!response.ok) {
-      throw ApiError.badRequest("Invalid or expired Google access token.")
-    }
-    const data = await response.json()
-    if (!data.email) {
-      throw ApiError.badRequest("Unable to retrieve email from Google account.")
-    }
     if (!env.GOOGLE_CLIENT_ID) {
       throw ApiError.badRequest("Google sign-in is not configured on the server.")
     }
-    if (data.aud !== env.GOOGLE_CLIENT_ID) {
+
+    const tokenInfoResponse = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+    )
+    if (!tokenInfoResponse.ok) {
+      throw ApiError.badRequest("Invalid or expired Google access token.")
+    }
+    const data = await tokenInfoResponse.json()
+    const audience = data.aud || data.audience
+    if (audience && audience !== env.GOOGLE_CLIENT_ID) {
       throw ApiError.unauthorized("Google token audience mismatch.")
     }
     if (data.azp && data.azp !== env.GOOGLE_CLIENT_ID) {
       throw ApiError.unauthorized("Google token authorized party mismatch.")
     }
+
+    // The tokeninfo endpoint does not reliably include the profile photo,
+    // so fetch the full profile (name + picture) from the userinfo endpoint.
+    let info = null
+    try {
+      const infoResponse = await fetch(
+        `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${encodeURIComponent(accessToken)}`
+      )
+      if (infoResponse.ok) {
+        info = await infoResponse.json()
+      }
+    } catch {
+      /* fall back to tokeninfo data below */
+    }
+
+    const email = (info?.email || data.email || "").toLowerCase().trim()
+    if (!email) {
+      throw ApiError.badRequest("Unable to retrieve email from Google account.")
+    }
+
     profile = {
-      sub: data.sub,
-      email: data.email.toLowerCase().trim(),
-      name: data.name || data.email.split("@")[0],
-      picture: data.picture || "",
-      emailVerified: data.email_verified === true || data.email_verified === "true",
+      sub: info?.sub || data.sub || data.user_id,
+      email,
+      name: info?.name || data.name || email.split("@")[0],
+      picture: info?.picture || data.picture || "",
+      emailVerified:
+        info?.email_verified === true ||
+        data.email_verified === true ||
+        data.email_verified === "true" ||
+        data.verified_email === true,
     }
   } else if (isDemo && env.NODE_ENV !== "production") {
     // 3. Fallback demo mode for development testing before setting up Google Cloud Console credentials
@@ -285,9 +308,12 @@ export const googleAuth = asyncHandler(async (req, res) => {
       user.googleId = profile.sub
       modified = true
     }
-    if (!user.image && profile.picture) {
-      user.image = profile.picture
-      modified = true
+    const currentImageIsGoogle = user.image && /googleusercontent\.com/i.test(user.image)
+    if (profile.picture && (!user.image || currentImageIsGoogle)) {
+      if (user.image !== profile.picture) {
+        user.image = profile.picture
+        modified = true
+      }
     }
     if (user.authProvider !== "google" && !user.password) {
       user.authProvider = "google"
