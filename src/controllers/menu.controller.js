@@ -4,15 +4,15 @@ import { Wishlist } from "../models/Wishlist.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 import { optionalAuth, verifyToken, requireRole } from "../middlewares/auth.js"
+import { isPremiumActive } from "../utils/subscription.js"
 
 const CATEGORY_LABELS = {
-  neapolitan: "Neapolitan Wood-Fired",
-  "new-york": "New York Foldable",
-  "deep-dish": "Chicago Deep Dish",
-  detroit: "Detroit Square",
-  gourmet: "Gourmet White",
-  vegan: "Vegan & Plant-Based",
-  "gluten-free": "Gluten-Free Cauliflower",
+  classic: "Classic Pizzas",
+  vegetarian: "Vegetarian Pizzas",
+  "meat-lovers": "Meat Lovers",
+  specialty: "Specialty & Gourmet",
+  sides: "Sides & Appetizers",
+  beverages: "Beverages & Desserts",
 }
 
 export function serializeItem(item) {
@@ -29,6 +29,7 @@ export function serializeItem(item) {
     location: item.location,
     images: item.images,
     status: item.status,
+    isAvailable: item.isAvailable !== false,
     isFeatured: item.isFeatured,
     rating: item.rating || 0,
     reviewCount: item.reviewCount || 0,
@@ -43,6 +44,7 @@ export function serializeItem(item) {
     nutritionalInfo: item.nutritionalInfo || { calories: 0, protein: "", carbs: "", fat: "" },
     vendorId: vendor ? vendor._id.toString() : item.vendorId?.toString(),
     vendorName: vendor?.businessName || vendor?.name || "PizzaHub Vendor",
+    vendorIsPremium: vendor ? isPremiumActive(vendor) : false,
     vendorLocation: item.location,
     vendorAddress: item.location,
     createdAt: item.createdAt,
@@ -50,7 +52,10 @@ export function serializeItem(item) {
   }
 }
 
-const VENDOR_POPULATE = { path: "vendorId", select: "name businessName image email" }
+const VENDOR_POPULATE = {
+  path: "vendorId",
+  select: "name businessName image email subscriptionPlan subscriptionExpiresAt",
+}
 
 function buildSort(sort) {
   switch (sort) {
@@ -88,6 +93,7 @@ export const listMenuItems = asyncHandler(async (req, res) => {
     filter.vendorId = req.user._id
   } else {
     filter.status = "approved"
+    filter.isAvailable = { $ne: false }
   }
 
   if (search) {
@@ -129,7 +135,8 @@ export const getMenuItem = asyncHandler(async (req, res) => {
 
   const isOwner = req.user && item.vendorId && String(item.vendorId._id) === String(req.user._id)
   const isAdmin = req.user?.role === "admin"
-  if (item.status !== "approved" && !isOwner && !isAdmin) {
+  const isAvailable = item.isAvailable !== false
+  if ((item.status !== "approved" || !isAvailable) && !isOwner && !isAdmin) {
     throw ApiError.notFound("Pizza not found.")
   }
 
@@ -231,14 +238,15 @@ export const createMenuItem = asyncHandler(async (req, res) => {
       vendorId: vendor._id,
       status: { $in: ["pending", "approved"] },
     })
-    if (vendor.subscriptionPlan !== "premium" && activeCount >= 3) {
+    const premium = isPremiumActive(vendor)
+    if (!premium && activeCount >= 3) {
       throw ApiError.forbidden(
         "Free vendor accounts can list up to 3 active pizzas. Upgrade to Premium for unlimited listings."
       )
     }
     payload.vendorId = vendor._id
     payload.status = "pending"
-    payload.isFeatured = false
+    payload.isFeatured = premium
     if (!req.body.location && vendor.businessName) payload.location = vendor.businessName
   } else {
     payload.vendorId = req.body.vendorId
@@ -266,7 +274,7 @@ export const updateMenuItem = asyncHandler(async (req, res) => {
 
   if (!isAdmin) {
     item.status = "pending"
-    item.isFeatured = false
+    item.isFeatured = isPremiumActive(req.user)
   }
 
   await item.save()
@@ -303,6 +311,21 @@ export const setItemStatus = asyncHandler(async (req, res) => {
     { new: true, runValidators: true }
   ).populate(VENDOR_POPULATE)
   if (!item) throw ApiError.notFound("Pizza not found.")
+  res.status(200).json({ success: true, item: serializeItem(item) })
+})
+
+export const setItemAvailability = asyncHandler(async (req, res) => {
+  const item = await MenuItem.findById(req.params.id)
+  if (!item) throw ApiError.notFound("Pizza not found.")
+
+  const isAdmin = req.user.role === "admin"
+  const isOwner = String(item.vendorId) === String(req.user._id)
+  if (!isAdmin && !isOwner) throw ApiError.forbidden("You can only edit your own menu items.")
+
+  item.isAvailable = Boolean(req.body.isAvailable)
+  await item.save()
+  await item.populate(VENDOR_POPULATE)
+
   res.status(200).json({ success: true, item: serializeItem(item) })
 })
 

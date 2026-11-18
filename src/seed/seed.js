@@ -5,6 +5,7 @@ import { User } from "../models/User.js"
 import { MenuItem } from "../models/MenuItem.js"
 import { Review } from "../models/Review.js"
 import { hashPassword } from "../utils/password.js"
+import { recalculateItemRating } from "../utils/ratings.js"
 
 const vendors = [
   { key: "bella", name: "Marco Bellini", email: "vendor@pizzahub.com", businessName: "Bella Napoli Wood Ovens", location: "Little Italy, Manhattan" },
@@ -32,7 +33,7 @@ const items = [
   {
     vendor: "bella",
     itemName: "Margherita Di Bufala D.O.P.",
-    category: "neapolitan",
+    category: "classic",
     description:
       "Certified San Marzano tomatoes, imported campana buffalo mozzarella, fresh sweet basil & organic olive oil.",
     longDescription:
@@ -43,8 +44,6 @@ const items = [
     isVegetarian: true,
     isSpicy: false,
     isGlutenFree: false,
-    rating: 4.9,
-    reviewCount: 384,
     deliveryTime: "25-30 min",
     deliveryFee: 0,
     doughFermentation: "72-Hour Cold Fermentation (Caputo 00)",
@@ -55,7 +54,7 @@ const items = [
   {
     vendor: "brooklyn",
     itemName: "Crispy Cup Double Pepperoni",
-    category: "new-york",
+    category: "meat-lovers",
     description:
       "Charred cupping pepperoni with curled crispy edges, spicy honey drizzle, low moisture whole-milk mozzarella.",
     longDescription:
@@ -66,8 +65,6 @@ const items = [
     isVegetarian: false,
     isSpicy: true,
     isGlutenFree: false,
-    rating: 4.9,
-    reviewCount: 512,
     deliveryTime: "20-25 min",
     deliveryFee: 1.99,
     doughFermentation: "48-Hour Cold Rise",
@@ -78,7 +75,7 @@ const items = [
   {
     vendor: "osteria",
     itemName: "Black Truffle & Foraged Mushroom",
-    category: "gourmet",
+    category: "specialty",
     description:
       "Cremini and chanterelle mushrooms, white truffle cream, fontina, whipped ricotta and cracked black pepper.",
     longDescription:
@@ -89,8 +86,6 @@ const items = [
     isVegetarian: true,
     isSpicy: false,
     isGlutenFree: false,
-    rating: 5,
-    reviewCount: 228,
     deliveryTime: "30-35 min",
     deliveryFee: 0,
     doughFermentation: "60-Hour Sourdough Poolish",
@@ -101,7 +96,7 @@ const items = [
   {
     vendor: "square",
     itemName: "Detroit Motor City Vodka Sausage",
-    category: "detroit",
+    category: "specialty",
     description:
       "Thick caramelized cheese perimeter, house-made fennel sausage, creamy vodka sauce and crushed oregano.",
     longDescription:
@@ -112,8 +107,6 @@ const items = [
     isVegetarian: false,
     isSpicy: false,
     isGlutenFree: false,
-    rating: 4.8,
-    reviewCount: 194,
     deliveryTime: "25-30 min",
     deliveryFee: 2.5,
     doughFermentation: "48-Hour High Hydration Focaccia",
@@ -124,7 +117,7 @@ const items = [
   {
     vendor: "windy",
     itemName: "Chicago Deep Dish Supreme",
-    category: "deep-dish",
+    category: "meat-lovers",
     description:
       "Two inches of molten mozzarella, layers of seasoned ground chuck, green peppers, mushrooms and chunky plum sauce.",
     longDescription:
@@ -135,8 +128,6 @@ const items = [
     isVegetarian: false,
     isSpicy: false,
     isGlutenFree: false,
-    rating: 4.9,
-    reviewCount: 410,
     deliveryTime: "35-40 min",
     deliveryFee: 0,
     doughFermentation: "Butter-Laminated Cornmeal Crust",
@@ -147,7 +138,7 @@ const items = [
   {
     vendor: "roma",
     itemName: "Sweet Hot Honey & Prosciutto Crudo",
-    category: "neapolitan",
+    category: "meat-lovers",
     description:
       "24-month aged Prosciutto di Parma laid over melted stracciatella, fresh baby arugula and habanero honey.",
     longDescription:
@@ -158,8 +149,6 @@ const items = [
     isVegetarian: false,
     isSpicy: true,
     isGlutenFree: false,
-    rating: 4.9,
-    reviewCount: 340,
     deliveryTime: "20-25 min",
     deliveryFee: 1.5,
     doughFermentation: "72-Hour Poolish Pre-Ferment",
@@ -170,7 +159,7 @@ const items = [
   {
     vendor: "brooklyn",
     itemName: "Smoky BBQ Jackfruit & Cashew Mozz",
-    category: "vegan",
+    category: "vegetarian",
     description:
       "Slow-roasted pulled jackfruit, hickory brown sugar BBQ, house cultured cashew mozzarella and pickled red onions.",
     longDescription:
@@ -181,8 +170,6 @@ const items = [
     isVegetarian: true,
     isSpicy: false,
     isGlutenFree: false,
-    rating: 4.8,
-    reviewCount: 165,
     deliveryTime: "25-30 min",
     deliveryFee: 1.99,
     doughFermentation: "48-Hour Vegan Certified Dough",
@@ -193,7 +180,7 @@ const items = [
   {
     vendor: "bella",
     itemName: "Cauliflower Crust Garden Primavera",
-    category: "gluten-free",
+    category: "vegetarian",
     description:
       "Certified gluten-free roasted cauliflower crust, basil pesto, zucchini blossoms, cherry tomatoes and goat cheese.",
     longDescription:
@@ -204,8 +191,6 @@ const items = [
     isVegetarian: true,
     isSpicy: false,
     isGlutenFree: true,
-    rating: 4.7,
-    reviewCount: 142,
     deliveryTime: "25-30 min",
     deliveryFee: 0,
     doughFermentation: "Grain-Free Pressed Cauliflower Base",
@@ -216,7 +201,7 @@ const items = [
   {
     vendor: "osteria",
     itemName: "Quattro Formaggi & Caramelized Fig",
-    category: "gourmet",
+    category: "vegetarian",
     description:
       "Gorgonzola dolce, aged provolone, fior di latte, parmigiano, mission fig preserve and toasted walnuts.",
     longDescription:
@@ -227,8 +212,6 @@ const items = [
     isVegetarian: true,
     isSpicy: false,
     isGlutenFree: false,
-    rating: 4.8,
-    reviewCount: 178,
     deliveryTime: "30-35 min",
     deliveryFee: 0,
     doughFermentation: "60-Hour Sourdough Poolish",
@@ -239,7 +222,7 @@ const items = [
   {
     vendor: "roma",
     itemName: "Spicy Diavola & Calabrian Chili",
-    category: "neapolitan",
+    category: "meat-lovers",
     description:
       "Spicy Soppressata salami, crushed Calabrian chili paste, smoked mozzarella and fresh oregano.",
     longDescription:
@@ -250,8 +233,6 @@ const items = [
     isVegetarian: false,
     isSpicy: true,
     isGlutenFree: false,
-    rating: 4.9,
-    reviewCount: 285,
     deliveryTime: "20-25 min",
     deliveryFee: 1.5,
     doughFermentation: "72-Hour Poolish Pre-Ferment",
@@ -262,7 +243,7 @@ const items = [
   {
     vendor: "windy",
     itemName: "Chicago Carnivore Meat-Lover's Pan",
-    category: "deep-dish",
+    category: "meat-lovers",
     description:
       "Pepperoni, Italian fennel sausage, applewood smoked bacon, shaved country ham and three cheeses.",
     longDescription:
@@ -273,8 +254,6 @@ const items = [
     isVegetarian: false,
     isSpicy: false,
     isGlutenFree: false,
-    rating: 4.8,
-    reviewCount: 310,
     deliveryTime: "35-40 min",
     deliveryFee: 0,
     doughFermentation: "Butter-Laminated Cornmeal Crust",
@@ -285,7 +264,7 @@ const items = [
   {
     vendor: "square",
     itemName: "Detroit Crispy Corner Pepperoni Classic",
-    category: "detroit",
+    category: "classic",
     description:
       "Four crispy corners with burnt cheese lace, racing red sauce stripes, and garlic butter brushed crust.",
     longDescription:
@@ -296,14 +275,151 @@ const items = [
     isVegetarian: false,
     isSpicy: false,
     isGlutenFree: false,
-    rating: 4.9,
-    reviewCount: 220,
     deliveryTime: "25-30 min",
     deliveryFee: 2.5,
     doughFermentation: "48-Hour High Hydration Focaccia",
     ovenTemperature: "550°F (Cast Steel Pans)",
     ingredients: ["Wisconsin Brick Cheese", "Natural-Casing Cup Pepperoni", "Simmered Marinara Racing Stripes", "Roasted Garlic Herb Butter Crust", "Flaky Sicilian Sea Salt"],
     nutritionalInfo: { calories: 1220, protein: "58g", carbs: "114g", fat: "58g" },
+  },
+  {
+    vendor: "bella",
+    itemName: "Garlic Knots & Marinara Dip",
+    category: "sides",
+    description:
+      "Six pillowy garlic-butter knots dusted with parmesan and served with warm San Marzano marinara.",
+    longDescription:
+      "Our signature dough tied into soft knots, brushed with roasted garlic herb butter, showered with Parmigiano Reggiano, and served with a warm bowl of San Marzano dipping sauce.",
+    price: 7.5,
+    images: ["https://images.unsplash.com/photo-1619535860434-ba1d8fa12536?auto=format&fit=crop&w=1000&q=80"],
+    isFeatured: false,
+    isVegetarian: true,
+    isSpicy: false,
+    isGlutenFree: false,
+    deliveryTime: "20-25 min",
+    deliveryFee: 0,
+    doughFermentation: "48-Hour Cold Rise",
+    ovenTemperature: "650°F (Stone Deck)",
+    ingredients: ["Slow-Fermented Dough", "Roasted Garlic Herb Butter", "Parmigiano Reggiano", "San Marzano Marinara"],
+    nutritionalInfo: { calories: 520, protein: "16g", carbs: "68g", fat: "20g" },
+  },
+  {
+    vendor: "brooklyn",
+    itemName: "Buffalo Chicken Wings",
+    category: "sides",
+    description:
+      "Crispy oven-roasted wings tossed in tangy buffalo sauce with blue cheese dip and celery.",
+    longDescription:
+      "Jumbo chicken wings roasted until shatteringly crisp, coated in a house buffalo sauce with a cooling blue cheese dip and fresh celery sticks.",
+    price: 11.99,
+    images: ["https://images.unsplash.com/photo-1608039755401-742074f0548d?auto=format&fit=crop&w=1000&q=80"],
+    isFeatured: false,
+    isVegetarian: false,
+    isSpicy: true,
+    isGlutenFree: true,
+    deliveryTime: "20-25 min",
+    deliveryFee: 1.99,
+    doughFermentation: "",
+    ovenTemperature: "500°F (Convection Roast)",
+    ingredients: ["Jumbo Chicken Wings", "Buffalo Hot Sauce", "Blue Cheese Dip", "Celery Sticks"],
+    nutritionalInfo: { calories: 640, protein: "42g", carbs: "8g", fat: "46g" },
+  },
+  {
+    vendor: "osteria",
+    itemName: "Tomato Basil Bruschetta",
+    category: "sides",
+    description:
+      "Toasted sourdough topped with marinated heirloom tomatoes, basil, garlic and balsamic glaze.",
+    longDescription:
+      "Four slices of grilled sourdough loaded with sweet heirloom tomatoes, torn basil, shaved garlic, extra virgin olive oil, and a drizzle of aged balsamic.",
+    price: 8.25,
+    images: ["https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?auto=format&fit=crop&w=1000&q=80"],
+    isFeatured: false,
+    isVegetarian: true,
+    isSpicy: false,
+    isGlutenFree: false,
+    deliveryTime: "15-20 min",
+    deliveryFee: 0,
+    doughFermentation: "",
+    ovenTemperature: "450°F (Grill)",
+    ingredients: ["Grilled Sourdough", "Heirloom Tomatoes", "Fresh Basil", "Aged Balsamic Glaze"],
+    nutritionalInfo: { calories: 380, protein: "12g", carbs: "48g", fat: "16g" },
+  },
+  {
+    vendor: "windy",
+    itemName: "Classic Italian Tiramisu",
+    category: "beverages",
+    description:
+      "Espresso-soaked ladyfingers layered with mascarpone cream and dusted cocoa.",
+    longDescription:
+      "A generous slice of traditional tiramisu made with Italian mascarpone, strong espresso, marsala-soaked ladyfingers, and a snow of dark cocoa.",
+    price: 9.5,
+    images: ["https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=1000&q=80"],
+    isFeatured: false,
+    isVegetarian: true,
+    isSpicy: false,
+    isGlutenFree: false,
+    deliveryTime: "15-20 min",
+    deliveryFee: 0,
+    ingredients: ["Mascarpone Cream", "Espresso-Soaked Ladyfingers", "Marsala", "Dark Cocoa"],
+    nutritionalInfo: { calories: 460, protein: "9g", carbs: "44g", fat: "27g" },
+  },
+  {
+    vendor: "roma",
+    itemName: "Pistachio Gelato",
+    category: "beverages",
+    description:
+      "Two scoops of silky Italian pistachio gelato made with Bronte pistachios.",
+    longDescription:
+      "Dense, slow-churned gelato crafted with Bronte pistachio paste and fresh milk for a rich, nutty finish.",
+    price: 6.5,
+    images: ["https://images.unsplash.com/photo-1567206563064-6f60f40a2b57?auto=format&fit=crop&w=1000&q=80"],
+    isFeatured: false,
+    isVegetarian: true,
+    isSpicy: false,
+    isGlutenFree: true,
+    deliveryTime: "15-20 min",
+    deliveryFee: 0,
+    ingredients: ["Bronte Pistachio Paste", "Fresh Whole Milk", "Cane Sugar"],
+    nutritionalInfo: { calories: 320, protein: "8g", carbs: "34g", fat: "18g" },
+  },
+  {
+    vendor: "square",
+    itemName: "Sparkling Blood Orange Soda",
+    category: "beverages",
+    description:
+      "Chilled Italian blood orange soda with real fruit and a bright citrus finish.",
+    longDescription:
+      "A 330ml bottle of Sicilian blood orange soda, lightly sweetened and served ice cold to balance the richness of a Detroit-style slice.",
+    price: 4.25,
+    images: ["https://images.unsplash.com/photo-1581636625402-29b2a704ef13?auto=format&fit=crop&w=1000&q=80"],
+    isFeatured: false,
+    isVegetarian: true,
+    isSpicy: false,
+    isGlutenFree: true,
+    deliveryTime: "15-20 min",
+    deliveryFee: 0,
+    ingredients: ["Sicilian Blood Orange Juice", "Sparkling Water", "Cane Sugar"],
+    nutritionalInfo: { calories: 140, protein: "0g", carbs: "34g", fat: "0g" },
+  },
+  {
+    vendor: "bella",
+    itemName: "Fresh Mint Lemonade",
+    category: "beverages",
+    description:
+      "House-pressed lemonade shaken with fresh mint and served over ice.",
+    longDescription:
+      "A 500ml bottle of house-pressed lemonade infused with garden mint and lightly sweetened — the perfect palate cleanser for a wood-fired Margherita.",
+    price: 4.5,
+    images: ["https://images.unsplash.com/photo-1621263764928-df1444c5e859?auto=format&fit=crop&w=1000&q=80"],
+    isFeatured: false,
+    isVegetarian: true,
+    isSpicy: false,
+    isGlutenFree: true,
+    deliveryTime: "15-20 min",
+    deliveryFee: 0,
+    ingredients: ["Fresh-Pressed Lemons", "Garden Mint", "Cane Sugar", "Spring Water"],
+    nutritionalInfo: { calories: 110, protein: "0g", carbs: "28g", fat: "0g" },
   },
 ]
 
@@ -384,8 +500,6 @@ async function seed() {
           isFeatured: entry.isFeatured,
           deliveryTime: entry.deliveryTime,
           deliveryFee: entry.deliveryFee,
-          rating: entry.rating,
-          reviewCount: entry.reviewCount,
           isVegetarian: entry.isVegetarian,
           isSpicy: entry.isSpicy,
           isGlutenFree: entry.isGlutenFree,
@@ -417,6 +531,11 @@ async function seed() {
       { $set: { rating: review.rating, comment: review.comment } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     )
+  }
+
+  console.log("[Seed] Recalculating item ratings from reviews...")
+  for (const item of Object.values(itemDocs)) {
+    await recalculateItemRating(item._id)
   }
 
   const [userCount, itemCount, reviewCount] = await Promise.all([

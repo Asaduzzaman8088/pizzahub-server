@@ -17,13 +17,12 @@ const menuItemSchema = new mongoose.Schema(
       required: [true, "Category is required"],
       enum: {
         values: [
-          "neapolitan",
-          "deep-dish",
-          "detroit",
-          "new-york",
-          "gourmet",
-          "vegan",
-          "gluten-free",
+          "classic",
+          "vegetarian",
+          "meat-lovers",
+          "specialty",
+          "sides",
+          "beverages",
         ],
         message: "{VALUE} is not a supported category",
       },
@@ -56,6 +55,10 @@ const menuItemSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "approved", "rejected", "inactive"],
       default: "pending",
+    },
+    isAvailable: {
+      type: Boolean,
+      default: true,
     },
     isFeatured: {
       type: Boolean,
