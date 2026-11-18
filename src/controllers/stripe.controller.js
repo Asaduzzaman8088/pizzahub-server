@@ -4,6 +4,7 @@ import { User } from "../models/User.js"
 import { Transaction } from "../models/Transaction.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
+import { isPremiumActive } from "../utils/subscription.js"
 
 const PREMIUM_DAYS = 30
 
@@ -42,15 +43,29 @@ async function activatePremium({ vendorId, sessionId, subscriptionId, amount }) 
   return expiresAt
 }
 
+async function downgradeVendor(vendorId) {
+  if (!vendorId) return
+  await User.findByIdAndUpdate(vendorId, {
+    subscriptionPlan: "free",
+    subscriptionExpiresAt: null,
+  })
+}
+
+async function findVendorIdBySubscription(subscriptionId) {
+  if (!subscriptionId) return null
+  const transaction = await Transaction.findOne({ stripeSubscriptionId: subscriptionId }).select(
+    "vendorId"
+  )
+  return transaction?.vendorId || null
+}
+
 export const getSubscriptionStatus = asyncHandler(async (req, res) => {
-  const active =
-    req.user.subscriptionPlan === "premium" &&
-    (!req.user.subscriptionExpiresAt || req.user.subscriptionExpiresAt > new Date())
+  const active = isPremiumActive(req.user)
 
   res.status(200).json({
     success: true,
-    plan: active ? "premium" : req.user.subscriptionPlan || "free",
-    subscriptionExpiresAt: req.user.subscriptionExpiresAt,
+    plan: active ? "premium" : "free",
+    subscriptionExpiresAt: active ? req.user.subscriptionExpiresAt : null,
     stripeConfigured: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_PREMIUM_PRICE_ID),
   })
 })
@@ -73,8 +88,8 @@ export const createCheckoutSession = asyncHandler(async (req, res) => {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: env.STRIPE_PREMIUM_PRICE_ID, quantity: 1 }],
-    success_url: `${env.CLIENT_URL}/dashboard/vendor/subscription?checkout=success`,
-    cancel_url: `${env.CLIENT_URL}/dashboard/vendor/subscription?checkout=cancelled`,
+    success_url: `${env.CLIENT_URL}/payment/success`,
+    cancel_url: `${env.CLIENT_URL}/payment/cancel`,
     customer_email: req.user.email,
     client_reference_id: req.user._id.toString(),
     metadata: { vendorId: req.user._id.toString(), plan: "premium" },
@@ -111,6 +126,28 @@ export const handleWebhook = async (req, res) => {
           subscriptionId: session.subscription,
           amount: session.amount_total ? session.amount_total / 100 : 19.99,
         })
+      }
+    } else if (event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object
+      const vendorId =
+        subscription.metadata?.vendorId ||
+        (await findVendorIdBySubscription(subscription.id))
+      await downgradeVendor(vendorId)
+    } else if (event.type === "customer.subscription.updated") {
+      const subscription = event.data.object
+      if (["canceled", "unpaid", "incomplete_expired"].includes(subscription.status)) {
+        const vendorId =
+          subscription.metadata?.vendorId ||
+          (await findVendorIdBySubscription(subscription.id))
+        await downgradeVendor(vendorId)
+      }
+    } else if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object
+      if (invoice.subscription) {
+        await Transaction.updateMany(
+          { stripeSubscriptionId: invoice.subscription },
+          { status: "failed" }
+        )
       }
     }
 
