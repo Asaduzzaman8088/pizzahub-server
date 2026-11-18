@@ -4,7 +4,9 @@ import morgan from "morgan"
 import helmet from "helmet"
 import cookieParser from "cookie-parser"
 import rateLimit from "express-rate-limit"
+import { toNodeHandler } from "better-auth/node"
 import { env } from "./config/env.js"
+import { auth } from "./config/auth.js"
 import apiRoutes from "./routes/index.js"
 import { errorHandler, notFoundHandler } from "./middlewares/error.js"
 
@@ -50,6 +52,9 @@ app.use("/api/stripe/webhook", express.raw({ type: "application/json" }))
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 app.use(cookieParser())
+
+// Better Auth handles its own authentication endpoints (sign-up, sign-in, sessions, OAuth).
+app.all("/api/better-auth/*", toNodeHandler(auth))
 
 app.use("/api", apiRoutes)
 
