@@ -1,61 +1,139 @@
-# 🍕 PizzaHub — Express & MongoDB Backend Server
+# PizzaHub — Server
 
-The official Node.js & Express REST API for **PizzaHub** — an artisan pizza ordering and multi-vendor platform with role-based access control (RBAC), JWT authentication, and Stripe payments for vendor subscriptions.
+The Express + MongoDB REST API for **PizzaHub**, a multi-vendor pizza ordering platform. It provides authentication, role-based authorization, menu and order management, reviews, wishlist, admin moderation, and Stripe subscription payments.
 
-## 🚀 Tech Stack
-- **Runtime:** Node.js (ES Modules)
-- **Framework:** Express.js 4/5
-- **Database:** MongoDB & Mongoose ORM
-- **Authentication:** JWT & Cookie-based token verification + RBAC
-- **Payment Gateway:** Stripe Checkout & Webhook signature verification
+- **Live API:** `<LIVE_API_URL>`
+- **Server repository:** `<SERVER_GITHUB_URL>`
+- **Client repository:** `<CLIENT_GITHUB_URL>`
 
-## 📁 Architecture & Directory Structure
+## Features
+
+- **Better Auth** for email/password credential auth (MongoDB adapter) plus Google OAuth support.
+- JWT issuance + `verifyToken` and `requireRole` middleware for every protected route.
+- Role model: `customer`, `vendor`, `admin`; public registration cannot create admins.
+- Password rule enforcement (6+ chars, uppercase + lowercase).
+- Menu CRUD with admin approval workflow (`pending` / `approved` / `rejected` / `inactive`) and a separate vendor availability toggle.
+- Vendor plan limits: free = 3 active items, Premium = unlimited.
+- Admin approve/reject/feature/delete for menu items.
+- Orders with status lifecycle (`pending` / `accepted` / `rejected` / `cancelled`), ownership checks, and duplicate active-order prevention.
+- Reviews and ratings with automatic rating recalculation.
+- Customer wishlist.
+- Stripe Checkout for **vendor Premium subscriptions only**. Premium is activated only by a verified webhook (`checkout.session.completed`), downgraded on `customer.subscription.deleted` / `updated` (canceled/unpaid) and failed invoices.
+- Admin read-only transactions endpoint.
+- Helmet, CORS whitelist, rate limiting, centralized error handling, custom 404.
+- Demo seed script with vendors, customers, admin, pizzas, sides, drinks, desserts, and reviews.
+
+## Tech Stack
+
+| Area | Packages |
+| --- | --- |
+| Runtime | Node.js (ES Modules) |
+| Framework | Express 4 |
+| Database | MongoDB, Mongoose, official `mongodb` driver |
+| Auth | `better-auth`, `@better-auth/mongo-adapter`, `jsonwebtoken`, `bcryptjs` (legacy migration), `cookie-parser` |
+| Payments | `stripe` |
+| Security | `helmet`, `cors`, `express-rate-limit` |
+| Tooling | `nodemon`, `dotenv`, `morgan` |
+
+## Project Structure
+
 ```
-pizzahub-server/
-├── src/
-│   ├── config/
-│   │   ├── db.js             # MongoDB connection with retry & error listeners
-│   │   └── env.js            # Environment variable validation & defaults
-│   ├── middlewares/
-│   │   ├── auth.js           # verifyToken & requireRole RBAC middleware
-│   │   └── error.js          # 404 notFound & central error handlers
-│   ├── models/
-│   │   ├── User.js           # User schema (Customer, Vendor, Admin, Subscription)
-│   │   ├── MenuItem.js       # Pizza menu item schema with pending/approved status
-│   │   ├── Order.js          # Order schema with lifecycle states
-│   │   ├── Transaction.js    # Stripe subscription transaction records
-│   │   ├── Review.js         # Customer ratings and reviews
-│   │   └── Wishlist.js       # Customer favorite items
-│   ├── routes/
-│   │   ├── health.js         # /api/health monitoring endpoint
-│   │   └── index.js          # Master route registry
-│   ├── app.js                # Express app setup, CORS, raw Stripe webhook, parsers
-│   └── index.js              # Server entry point & graceful shutdown
-├── .env.example
-├── .gitignore
-└── package.json
+src/
+├── app.js                     # Express app, CORS, rate limit, Better Auth mount
+├── index.js                   # Server bootstrap + graceful shutdown
+├── config/
+│   ├── auth.js                # Better Auth configuration
+│   ├── db.js                  # Mongoose connection
+│   └── env.js                 # Environment validation/defaults
+├── controllers/               # auth, menu, order, review, wishlist, stripe, dashboard, admin
+├── middlewares/               # verifyToken / requireRole / error handling
+├── models/                    # User, MenuItem, Order, Review, Wishlist, Transaction
+├── routes/                    # /api route registry
+├── seed/seed.js               # Demo data
+└── utils/                     # ApiError, asyncHandler, password, ratings, subscription
 ```
 
-## ⚙️ Environment Configuration
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-Key variables:
-- `PORT`: Server port (default: 5000)
-- `CLIENT_URL`: Client URL for CORS whitelist (default: `http://localhost:3000`)
-- `MONGO_URI`: MongoDB connection string
-- `JWT_SECRET`: Secret key for JWT signing & verification
-- `STRIPE_SECRET_KEY`: Stripe test/live secret key
-- `STRIPE_WEBHOOK_SECRET`: Signing secret for Stripe webhooks
+## Getting Started
 
-## 💻 Running the Server
 ```bash
 npm install
+cp .env.example .env
+npm run seed     # optional demo data (also creates admin credentials)
 npm run dev
 ```
 
-Test health check:
+API runs at http://localhost:5000. Health check: `GET /api/health`.
+
+### Environment variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `PORT` | No | Server port (default `5000`) |
+| `NODE_ENV` | No | `development` / `production` |
+| `CLIENT_URL` | Yes | Client origin for CORS and Stripe redirects |
+| `MONGO_URI` | Yes | MongoDB connection string |
+| `JWT_SECRET` | Yes | JWT signing secret |
+| `JWT_EXPIRES_IN` | No | JWT lifetime (default `7d`) |
+| `BETTER_AUTH_URL` | Yes | Public server URL used by Better Auth |
+| `BETTER_AUTH_SECRET` | Yes | Better Auth signing secret (separate from JWT) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | No | Seeded admin credentials |
+| `STRIPE_SECRET_KEY` | Yes (payments) | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Yes (payments) | Stripe webhook signing secret |
+| `STRIPE_PREMIUM_PRICE_ID` | Yes (payments) | Stripe recurring Price ID for Premium |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional | Google OAuth credentials |
+
+Never commit `.env`; only `.env.example` is tracked.
+
+### Scripts
+
 ```bash
-curl http://localhost:5000/api/health
+npm run dev     # node --watch
+npm run start   # production
+npm run seed    # seed demo data
 ```
+
+## Auth architecture
+
+- **Better Auth** owns credential storage and exposes its endpoints under `/api/better-auth/*` (mounted with `toNodeHandler`).
+- The Express auth controllers call `auth.api.signUpEmail` / `auth.api.signInEmail`, then link the Better Auth user to the business `users` document via `authUserId` and issue the app JWT.
+- Legacy bcrypt accounts (including seeded demo users) are verified with bcrypt on first login and transparently migrated into Better Auth.
+- All protected APIs use `verifyToken` + `requireRole`, so client-side checks are never trusted.
+
+## Stripe subscription flow
+
+1. `POST /api/stripe/create-checkout-session` (vendor only) creates a Stripe Checkout session with `vendorId` metadata.
+2. Stripe redirects to `/payment/success` or `/payment/cancel` on the client.
+3. `POST /api/stripe/webhook` verifies the signature and activates Premium only on `checkout.session.completed`.
+4. Subscription cancellation/expiry downgrades the vendor to free.
+5. Admin transactions are read-only; there is no endpoint to edit payment records.
+
+## Challenge implementation notes
+
+### Advanced search and sorting (`GET /api/menu`)
+Query parameters:
+- `search` — case-insensitive regex on `itemName` and `description`
+- `category` — one of `classic`, `vegetarian`, `meat-lovers`, `specialty`, `sides`, `beverages`
+- `location` — case-insensitive regex on the item location
+- `vendorId` — filter by vendor (`me` for the authenticated vendor)
+- `featured=true` — featured items only
+- `sort=price-asc | price-desc | rating | oldest | newest`
+- `page`, `limit` — pagination (limit capped at 50)
+
+Only `approved` and available items are returned publicly; admins can request other statuses.
+
+### JWT middleware flow
+`extractToken` reads `Authorization: Bearer <token>` or the httpOnly cookie → `jwt.verify` → loads the user from MongoDB → rejects missing/blocked users → `requireRole` enforces the role. Errors are mapped to `401` (invalid/expired) or `403` (forbidden).
+
+## Demo credentials
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@pizzahub.com` (or `ADMIN_EMAIL`) | `Admin@123` (or `ADMIN_PASSWORD`) |
+| Vendor | `vendor@pizzahub.com` | `Vendor@123` |
+| Customer | `customer@pizzahub.com` | `Customer@123` |
+
+## Deployment notes
+
+- Set `CLIENT_URL` to the deployed client origin and `BETTER_AUTH_URL` to the deployed API origin.
+- Configure the Stripe webhook endpoint as `https://<api-host>/api/stripe/webhook` and set `STRIPE_WEBHOOK_SECRET`.
+- Run `npm run seed` once against the production database to create the admin account.
