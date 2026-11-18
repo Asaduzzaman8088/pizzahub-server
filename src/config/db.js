@@ -4,7 +4,14 @@ import { env } from "./env.js"
 let isConnected = false
 
 export async function connectDB() {
-  if (isConnected) {
+  if (isConnected || mongoose.connection.readyState === 1) {
+    isConnected = true
+    return
+  }
+
+  if (mongoose.connection.readyState === 2) {
+    await mongoose.connection.asPromise()
+    isConnected = true
     return
   }
 
@@ -13,12 +20,16 @@ export async function connectDB() {
       serverSelectionTimeoutMS: 5000,
     })
     isConnected = true
-    console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host} (DB: ${conn.connection.name})`)
+    console.log(
+      `[MongoDB] Connected successfully to host: ${conn.connection.host} (DB: ${conn.connection.name})`
+    )
   } catch (error) {
+    isConnected = false
     console.error(`[MongoDB] Connection error:`, error.message)
-    // In dev without running mongo instance, allow app to boot and retry
+    // In development, keep the app booted so the UI can show a friendly error.
+    // In production (including serverless), fail the request instead of hanging.
     if (env.NODE_ENV === "production") {
-      process.exit(1)
+      throw error
     }
   }
 }

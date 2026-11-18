@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth"
 import { mongodbAdapter } from "@better-auth/mongo-adapter"
 import { MongoClient } from "mongodb"
-import { env } from "./env.js"
+import { env, getAllowedOrigins } from "./env.js"
 
 const mongoClient = new MongoClient(env.MONGO_URI)
 
@@ -25,9 +25,7 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   basePath: "/api/better-auth",
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.CLIENT_URL, "http://localhost:3000", "http://127.0.0.1:3000"].filter(
-    Boolean
-  ),
+  trustedOrigins: getAllowedOrigins(),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 6,

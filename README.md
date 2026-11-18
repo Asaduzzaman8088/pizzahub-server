@@ -70,7 +70,8 @@ API runs at http://localhost:5000. Health check: `GET /api/health`.
 | --- | --- | --- |
 | `PORT` | No | Server port (default `5000`) |
 | `NODE_ENV` | No | `development` / `production` |
-| `CLIENT_URL` | Yes | Client origin for CORS and Stripe redirects |
+| `CLIENT_URL` | Yes | Primary client origin for CORS and Stripe redirects |
+| `ALLOWED_ORIGINS` | No | Comma-separated extra origins (e.g. Vercel preview URLs) |
 | `MONGO_URI` | Yes | MongoDB connection string |
 | `JWT_SECRET` | Yes | JWT signing secret |
 | `JWT_EXPIRES_IN` | No | JWT lifetime (default `7d`) |
@@ -132,8 +133,20 @@ Only `approved` and available items are returned publicly; admins can request ot
 | Vendor | `vendor@pizzahub.com` | `Vendor@123` |
 | Customer | `customer@pizzahub.com` | `Customer@123` |
 
-## Deployment notes
+## Deployment notes (Vercel)
 
-- Set `CLIENT_URL` to the deployed client origin and `BETTER_AUTH_URL` to the deployed API origin.
-- Configure the Stripe webhook endpoint as `https://<api-host>/api/stripe/webhook` and set `STRIPE_WEBHOOK_SECRET`.
-- Run `npm run seed` once against the production database to create the admin account.
+The server ships with a serverless entry point at `api/index.js` and a `vercel.json` that routes all requests to the Express app.
+
+1. Set all required environment variables in the Vercel project:
+   - `NODE_ENV=production`
+   - `MONGO_URI` — a **cloud** MongoDB URI (Atlas). `127.0.0.1` is not reachable from Vercel.
+   - `JWT_SECRET`, `BETTER_AUTH_SECRET` — different, strong random values.
+   - `BETTER_AUTH_URL=https://<server-project>.vercel.app`
+   - `CLIENT_URL=https://<client-project>.vercel.app`
+   - `ALLOWED_ORIGINS` — any extra client origins (optional)
+   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PREMIUM_PRICE_ID`
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (optional)
+2. CORS is strict: only `CLIENT_URL`, `ALLOWED_ORIGINS`, and localhost in development are accepted. Unknown origins receive `403`.
+3. Configure the Stripe webhook endpoint as `https://<server-host>/api/stripe/webhook`.
+4. Run `npm run seed` once against the production database to create the admin account.
+5. In production the server refuses to boot if any required secret is missing.
