@@ -27,7 +27,8 @@ export function setAuthCookie(res, token) {
 }
 
 export function clearAuthCookie(res) {
-  res.clearCookie(env.COOKIE_NAME, { path: "/" })
+  const { maxAge, ...options } = cookieOptions()
+  res.clearCookie(env.COOKIE_NAME, options)
 }
 
 function extractToken(req) {
