@@ -1,9 +1,11 @@
 import { Router } from "express"
 import mongoose from "mongoose"
+import { connectDB } from "../config/db.js"
 
 const router = Router()
 
-router.get("/health", (req, res) => {
+router.get("/health", async (req, res) => {
+  await connectDB().catch(() => {})
   const dbState = mongoose.connection.readyState
   const dbStatusMap = {
     0: "disconnected",
