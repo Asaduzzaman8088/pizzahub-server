@@ -3,6 +3,7 @@ import { Order } from "../models/Order.js"
 import { MenuItem } from "../models/MenuItem.js"
 import { Review } from "../models/Review.js"
 import { Wishlist } from "../models/Wishlist.js"
+import { Transaction } from "../models/Transaction.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { serializeOrder, ORDER_POPULATE } from "./order.controller.js"
 
@@ -14,18 +15,26 @@ function toCountMap(rows) {
 }
 
 export const adminStats = asyncHandler(async (req, res) => {
-  const [usersByRole, ordersByStatus, revenueAgg, totalItems, pendingItems, recentOrders] =
-    await Promise.all([
-      User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
-      Order.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-      Order.aggregate([
-        { $match: { status: "accepted" } },
-        { $group: { _id: null, revenue: { $sum: "$totalPrice" } } },
-      ]),
-      MenuItem.countDocuments(),
-      MenuItem.countDocuments({ status: "pending" }),
-      Order.find().populate(ORDER_POPULATE).sort({ createdAt: -1 }).limit(5),
-    ])
+  const [
+    usersByRole,
+    ordersByStatus,
+    revenueAgg,
+    totalItems,
+    pendingItems,
+    totalTransactions,
+    recentOrders,
+  ] = await Promise.all([
+    User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
+    Order.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    Order.aggregate([
+      { $match: { status: "accepted" } },
+      { $group: { _id: null, revenue: { $sum: "$totalPrice" } } },
+    ]),
+    MenuItem.countDocuments(),
+    MenuItem.countDocuments({ status: "pending" }),
+    Transaction.countDocuments(),
+    Order.find().populate(ORDER_POPULATE).sort({ createdAt: -1 }).limit(5),
+  ])
 
   const roleCounts = toCountMap(usersByRole)
   const statusCounts = toCountMap(ordersByStatus)
@@ -51,6 +60,7 @@ export const adminStats = asyncHandler(async (req, res) => {
       revenue: revenueAgg[0]?.revenue || 0,
       totalItems,
       pendingItems,
+      totalTransactions,
     },
     recentOrders: recentOrders.map(serializeOrder),
   })

@@ -3,9 +3,32 @@ import { Order } from "../models/Order.js"
 import { MenuItem } from "../models/MenuItem.js"
 import { Review } from "../models/Review.js"
 import { Wishlist } from "../models/Wishlist.js"
+import { Transaction } from "../models/Transaction.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 import { sanitizeUser } from "./auth.controller.js"
+
+function serializeTransaction(transaction) {
+  const vendor = transaction.vendorId && transaction.vendorId._id ? transaction.vendorId : null
+  return {
+    id: transaction._id.toString(),
+    vendor: vendor
+      ? {
+          id: vendor._id.toString(),
+          name: vendor.businessName || vendor.name,
+          email: vendor.email,
+          image: vendor.image || "",
+        }
+      : null,
+    plan: transaction.plan,
+    amount: transaction.amount,
+    currency: transaction.currency,
+    status: transaction.status,
+    stripeSessionId: transaction.stripeSessionId,
+    stripeSubscriptionId: transaction.stripeSubscriptionId,
+    createdAt: transaction.createdAt,
+  }
+}
 
 export const listUsers = asyncHandler(async (req, res) => {
   const { search, role, page = 1, limit = 20 } = req.query
@@ -72,6 +95,33 @@ export const setUserRole = asyncHandler(async (req, res) => {
   if (!user) throw ApiError.notFound("User not found.")
 
   res.status(200).json({ success: true, user: sanitizeUser(user) })
+})
+
+export const listTransactions = asyncHandler(async (req, res) => {
+  const pageNum = Math.max(1, Number(req.query.page) || 1)
+  const limitNum = Math.min(100, Math.max(1, Number(req.query.limit) || 20))
+  const filter = {}
+
+  if (req.query.status && ["succeeded", "pending", "failed"].includes(req.query.status)) {
+    filter.status = req.query.status
+  }
+
+  const [transactions, total] = await Promise.all([
+    Transaction.find(filter)
+      .populate("vendorId", "name email businessName image")
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum),
+    Transaction.countDocuments(filter),
+  ])
+
+  res.status(200).json({
+    success: true,
+    total,
+    page: pageNum,
+    pages: Math.max(1, Math.ceil(total / limitNum)),
+    transactions: transactions.map(serializeTransaction),
+  })
 })
 
 export const deleteUser = asyncHandler(async (req, res) => {

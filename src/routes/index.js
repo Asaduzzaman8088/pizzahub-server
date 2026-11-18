@@ -45,6 +45,7 @@ apiRouter.get("/", (req, res) => {
         adminAll: "GET /api/menu/admin/all",
         approve: "PATCH /api/menu/:id/status",
         feature: "PATCH /api/menu/:id/feature",
+        availability: "PATCH /api/menu/:id/availability",
       },
       orders: {
         create: "POST /api/orders",
@@ -77,6 +78,7 @@ apiRouter.get("/", (req, res) => {
         blockUser: "PATCH /api/admin/users/:id/block",
         changeRole: "PATCH /api/admin/users/:id/role",
         deleteUser: "DELETE /api/admin/users/:id",
+        transactions: "GET /api/admin/transactions",
       },
     },
   })
