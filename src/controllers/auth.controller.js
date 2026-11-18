@@ -334,7 +334,13 @@ export const updateProfile = asyncHandler(async (req, res) => {
     if (!String(name).trim()) throw ApiError.badRequest("Name cannot be empty.")
     user.name = String(name).trim()
   }
-  if (image !== undefined) user.image = image
+  if (image !== undefined) {
+    const value = String(image).trim()
+    if (value && !/^https?:\/\//i.test(value)) {
+      throw ApiError.badRequest("Profile image must be a valid http(s) URL.")
+    }
+    user.image = value
+  }
   if (businessName !== undefined && user.role === "vendor") {
     user.businessName = String(businessName).trim()
   }
