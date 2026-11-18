@@ -61,6 +61,10 @@ app.use(cookieParser())
 
 // Ensure a single database connection in both long-running and serverless environments.
 app.use(async (req, res, next) => {
+  // Health checks should always respond, even while the database is reconnecting.
+  if (req.path === "/api/health" || req.path === "/health") {
+    return next()
+  }
   try {
     await connectDB()
     next()
