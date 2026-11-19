@@ -140,6 +140,21 @@ Only `approved` and available items are returned publicly; admins can request ot
 - Stripe webhook endpoint: `https://pizzahub-server-eight.vercel.app/api/stripe/webhook`
 - Use the demo accounts above with the Stripe test card `4242 4242 4242 4242` (any future expiry, any CVC) to test the vendor Premium flow.
 
+## Manual testing instructions
+
+1. **Live site:** https://pizzahub-client-two.vercel.app. The API is https://pizzahub-server-eight.vercel.app.
+2. **Stripe test mode:** use card `4242 4242 4242 4242`, any future expiry (e.g. `12/34`), any 3-digit CVC (e.g. `123`), and any ZIP/postal code. The Premium plan is `$5.00/month`.
+3. **Admin:** `admin@pizzahub.com` / `#Admin@2026`.
+4. **Vendor:** `vendor@pizzahub.com` / `Vendor@123`; additional vendors `vendor2@pizzahub.com` through `vendor6@pizzahub.com` also use `Vendor@123`.
+5. **Customer:** `customer@pizzahub.com` / `Customer@123`; additional customer `customer2@pizzahub.com` / `Customer@123`.
+6. **Premium flow:** sign in as a vendor → **Subscription** → **Upgrade with Stripe** → pay with the test card → **Payment Success**. The webhook activates Premium, features the vendor's listings, and shows the Premium badge. Cancel the subscription in the Stripe Dashboard to test the downgrade.
+7. **Menu approval flow:** vendor adds an item (uploads an image) → item is Pending → admin approves it in **Menu Moderation** → it appears on the public menu.
+8. **Order flow:** customer places an order with a delivery date/address/message → vendor accepts or rejects it in **Customer Orders** → customer can cancel only while it is pending.
+9. Customer orders do not use Stripe; only the vendor Premium subscription does.
+10. Google sign-in is enabled for the live domain.
+11. Image uploads use ImgBB; use any JPG/PNG for menu items or profile photos.
+12. Use a second browser or an incognito window to test vendor and customer flows at the same time.
+
 ## Deployment notes (Vercel)
 
 The server ships with a serverless entry point at `api/index.js` and a `vercel.json` that routes all requests to the Express app.
