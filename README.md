@@ -133,6 +133,13 @@ Only `approved` and available items are returned publicly; admins can request ot
 | Vendor | `vendor@pizzahub.com` | `Vendor@123` |
 | Customer | `customer@pizzahub.com` | `Customer@123` |
 
+## Testing the deployed API
+
+- Health: `GET https://pizzahub-server-eight.vercel.app/api/health`
+- Menu: `GET https://pizzahub-server-eight.vercel.app/api/menu?limit=6`
+- Stripe webhook endpoint: `https://pizzahub-server-eight.vercel.app/api/stripe/webhook`
+- Use the demo accounts above with the Stripe test card `4242 4242 4242 4242` (any future expiry, any CVC) to test the vendor Premium flow.
+
 ## Deployment notes (Vercel)
 
 The server ships with a serverless entry point at `api/index.js` and a `vercel.json` that routes all requests to the Express app.
