@@ -1,6 +1,7 @@
 import Stripe from "stripe"
 import { env } from "../config/env.js"
 import { User } from "../models/User.js"
+import { MenuItem } from "../models/MenuItem.js"
 import { Transaction } from "../models/Transaction.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
@@ -40,6 +41,9 @@ async function activatePremium({ vendorId, sessionId, subscriptionId, amount }) 
     { upsert: true, new: true, setDefaultsOnInsert: true }
   )
 
+  // Premium benefit: feature the vendor's listings on the homepage.
+  await MenuItem.updateMany({ vendorId }, { isFeatured: true })
+
   return expiresAt
 }
 
@@ -49,6 +53,8 @@ async function downgradeVendor(vendorId) {
     subscriptionPlan: "free",
     subscriptionExpiresAt: null,
   })
+  // Remove the premium featured placement when the plan ends.
+  await MenuItem.updateMany({ vendorId }, { isFeatured: false })
 }
 
 async function findVendorIdBySubscription(subscriptionId) {
